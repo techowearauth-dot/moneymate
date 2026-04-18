@@ -88,4 +88,4 @@ npx expo start
 
 ---
 
-*MoneyMate 2.0 — Empowering Gen Z with Financial Intelligence.*
+*MoneyMate — Empowering Gen Z with Financial Intelligence.*
