@@ -14,6 +14,7 @@ const SOURCES = ['HDFC Bank', 'SBI', 'ICICI Bank', 'Axis Bank', 'Paytm'];
 const SIMULATED_TEMPLATES = [
     {
         type: 'debit',
+        category: 'financial',
         generate: () => {
             const amount = Math.floor(Math.random() * 5000) + 50;
             const merchant = MERCHANTS[Math.floor(Math.random() * MERCHANTS.length)];
@@ -28,6 +29,7 @@ const SIMULATED_TEMPLATES = [
     },
     {
         type: 'credit',
+        category: 'financial',
         generate: () => {
             const amount = Math.floor(Math.random() * 20000) + 500;
             const bank = SOURCES[Math.floor(Math.random() * SOURCES.length)];
@@ -40,13 +42,56 @@ const SIMULATED_TEMPLATES = [
         }
     },
     {
-        type: 'other',
+        type: 'otp',
+        category: 'otp',
         generate: () => {
             const otp = Math.floor(100000 + Math.random() * 900000);
+            const templates = [
+                `${otp} is your OTP for transaction at Amazon. Do not share this with anyone.`,
+                `Verification code: ${otp}. Valid for 10 mins.`,
+                `Your OTP for secure login is ${otp}. Team MoneyMate.`
+            ];
             return {
-                text: `${otp} is your OTP for transaction at Amazon. Do not share this with anyone.`,
+                text: templates[Math.floor(Math.random() * templates.length)],
                 amount: 0,
-                merchant: 'Amazon'
+                merchant: 'Security'
+            };
+        }
+    },
+    {
+        type: 'ecommerce',
+        category: 'ecommerce',
+        generate: () => {
+            const orderId = Math.floor(Math.random() * 100000000);
+            const templates = [
+                `Your order #${orderId} has been shipped! Track it at bit.ly/track-order`,
+                `Your Amazon order will arrive today. Pin: 4827`,
+                `Order delivered! Hope you enjoyed shopping with Flipkart.`
+            ];
+            return {
+                text: templates[Math.floor(Math.random() * templates.length)],
+                amount: 0,
+                merchant: 'Ecommerce'
+            };
+        }
+    },
+    {
+        type: 'spam',
+        category: 'spam',
+        generate: () => {
+            const templates = [
+                "🔥 Win iPhone 15 now! Click here: bit.ly/win-iphone-now",
+                "Get ₹5000 cashback instantly! Limited offer! Claim at bit.ly/cashback-free",
+                "Congratulations! You are selected for a lucky draw worth ₹1 Lakh!",
+                "Earn ₹10,000 daily from home! Click now to join: bit.ly/work-from-home",
+                "Exclusive deal! 90% OFF on all products. Visit: bit.ly/mega-sale",
+                "You have won a free gift voucher worth ₹2000. Use code WIN2000",
+                "Click here to claim your reward now! bit.ly/reward-claim-01"
+            ];
+            return {
+                text: templates[Math.floor(Math.random() * templates.length)],
+                amount: 0,
+                merchant: 'Promotional'
             };
         }
     }

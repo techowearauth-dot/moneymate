@@ -28,6 +28,8 @@ export default function CustomDrawerContent(props) {
         { label: 'Payment Settings',  icon: 'card-outline',              screen: 'PaymentSettings',  bg: isDarkMode ? 'rgba(14, 165, 233, 0.1)'  : '#EFF6FF', color: '#0EA5E9' },
         { label: 'Fraud Detection',   icon: 'alert-circle-outline',      screen: 'FraudDetection',   bg: isDarkMode ? 'rgba(239, 68, 68, 0.1)'   : '#FEF2F2', color: '#EF4444' },
         { label: 'Stock Market',     icon: 'trending-up-outline',       screen: 'StockMarket',      bg: isDarkMode ? 'rgba(139, 92, 246, 0.1)' : '#F5F3FF', color: '#8B5CF6' },
+        { label: 'Parental Control',  icon: 'people-outline',            screen: 'ParentalControl',  bg: isDarkMode ? 'rgba(16, 185, 129, 0.1)' : '#ECFDF5', color: '#10B981' },
+        { label: 'Message Cabinet',   icon: 'mail-unread-outline',       screen: 'MessageCabinet',   bg: isDarkMode ? 'rgba(99, 102, 241, 0.1)' : '#EEF2FF', color: '#6366F1' },
         { label: 'Help & Support',    icon: 'help-circle-outline',       screen: 'HelpSupport',      bg: isDarkMode ? 'rgba(245, 158, 11, 0.1)'  : '#FFFBEB', color: '#F59E0B' },
         { label: 'About',             icon: 'information-circle-outline', screen: 'About',            bg: isDarkMode ? 'rgba(124, 58, 237, 0.1)'  : '#F5F3FF', color: '#7C3AED' },
     ];

@@ -270,14 +270,23 @@ function SmsCard({ theme }) {
 
 /** Category grid modal */
 function CatModal({ visible, selected, onSelect, onClose, theme }) {
-    const anim = useRef(new Animated.Value(height)).current;
+    const translateY = useSharedValue(height);
+
     useEffect(() => {
-        Animated.spring(anim, { toValue: visible ? 0 : height, bounciness: visible ? 5 : 0, useNativeDriver: true }).start();
+        translateY.value = withSpring(visible ? 0 : height, { 
+            damping: 15,
+            stiffness: 90
+        });
     }, [visible]);
+
+    const sheetStyle = useAnimatedStyle(() => ({
+        transform: [{ translateY: translateY.value }]
+    }));
+
     return (
         <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
             <Pressable style={S.overlay} onPress={onClose} />
-            <Animated.View style={[S.catSheet, { backgroundColor: theme.colors.surface }, { transform: [{ translateY: anim }] }]}>
+            <Animated.View style={[S.catSheet, { backgroundColor: theme.colors.surface }, sheetStyle]}>
                 <View style={[S.handle, { backgroundColor: theme.colors.border }]} />
                 <Text style={[S.catSheetTitle, { color: theme.colors.textPrimary }]}>Choose Category</Text>
                 <ScrollView showsVerticalScrollIndicator={false}>

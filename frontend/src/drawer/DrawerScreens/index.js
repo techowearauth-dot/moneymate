@@ -8,6 +8,9 @@ import FraudDetectionScreen from '../../screens/FraudDetectionScreen';
 import StockMarketScreen from '../../screens/StockMarketScreen';
 import SecuritySettingsScreen from '../../screens/SecuritySettingsScreen';
 import PaymentSettingsScreen from '../../screens/PaymentSettingsScreen';
+import ParentalControlScreen from '../../screens/ParentalControlScreen';
+import MessageCabinetScreen from '../../screens/MessageCabinetScreen';
+
 
 const ScreenTemplate = ({ title }) => (
     <SafeAreaView style={styles.container}>
@@ -27,7 +30,8 @@ export const AboutScreen = () => <ScreenTemplate title="About Vaultify" />;
 
 import LogsTransactionsScreen from '../../screens/LogsTransactionsScreen';
 
-export { FraudDetectionScreen, StockMarketScreen, LogsTransactionsScreen };
+export { FraudDetectionScreen, StockMarketScreen, LogsTransactionsScreen, ParentalControlScreen, MessageCabinetScreen };
+
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: COLORS.background },
