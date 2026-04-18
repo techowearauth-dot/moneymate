@@ -1,160 +1,156 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, StatusBar,
-    TouchableOpacity, Modal, Pressable, Animated,
+    TouchableOpacity, Modal, Pressable,
     Platform, Dimensions, Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { 
+    useSharedValue, 
+    useAnimatedStyle, 
+    withSpring, 
+    withTiming, 
+    FadeInDown, 
+    FadeInUp,
+    Layout,
+    interpolateColor
+} from 'react-native-reanimated';
+import { BlurView } from 'expo-blur';
 
 import { COLORS } from '../constants/colors';
-import { TYPOGRAPHY, SHADOWS, RADIUS } from '../constants/theme';
+import { TYPOGRAPHY, SHADOWS, RADIUS, GRADIENTS } from '../constants/theme';
 import { useTheme } from '../context/ThemeContext';
 import { useSMSAnalytics } from '../context/SMSAnalyticsContext';
 import { useFinance } from '../context/FinanceContext';
 import smsBotService from '../services/smsBotService';
+import GlassCard from '../components/GlassCard';
 
-const { height } = Dimensions.get('window');
-const INITIAL_LIMIT = 6;
+const { width, height } = Dimensions.get('window');
+const INITIAL_LIMIT = 5;
 
 // ─────────────────────────────────────────────────────────────
-//  CAT_ICONS
+//  COMPONENTS
 // ─────────────────────────────────────────────────────────────
-const CAT_ICONS = {
-    shopping: { icon: 'bag-outline', color: '#8B5CF6', bg: '#F5F3FF' },
-    transfer: { icon: 'swap-horizontal-outline', color: '#0EA5E9', bg: '#EFF6FF' },
-    food: { icon: 'restaurant-outline', color: '#F59E0B', bg: '#FFFBEB' },
-    salary: { icon: 'cash-outline', color: '#10B981', bg: '#ECFDF5' },
-    travel: { icon: 'car-outline', color: '#6366F1', bg: '#EEF2FF' },
-    entertainment: { icon: 'film-outline', color: '#EC4899', bg: '#FDF2F8' },
-    rent: { icon: 'home-outline', color: '#14B8A6', bg: '#F0FDFA' },
-    cashback: { icon: 'gift-outline', color: '#22C55E', bg: '#DCFCE7' },
-    recharge: { icon: 'phone-portrait-outline', color: '#EF4444', bg: '#FEF2F2' },
-    other: { icon: 'ellipsis-horizontal-outline', color: '#64748B', bg: '#F1F5F9' },
+
+/** Animated Number for count-up effect */
+const AnimatedNumber = ({ value, style }) => {
+    const [displayValue, setDisplayValue] = useState(0);
+    
+    useEffect(() => {
+        let start = displayValue;
+        const end = parseInt(value);
+        if (start === end) return;
+        
+        let totalDuration = 800;
+        let frameDuration = 1000 / 60;
+        let totalFrames = Math.round(totalDuration / frameDuration);
+        let currentFrame = 0;
+        
+        const animate = () => {
+            currentFrame++;
+            const progress = currentFrame / totalFrames;
+            const current = Math.round(start + (end - start) * progress);
+            setDisplayValue(current);
+            
+            if (currentFrame < totalFrames) {
+                requestAnimationFrame(animate);
+            }
+        };
+        
+        animate();
+    }, [value]);
+    
+    return <Text style={style}>{displayValue.toLocaleString()}</Text>;
 };
 
-// ─────────────────────────────────────────────────────────────
-//  DONUT CHART (Pure View — No SVG)
-// ─────────────────────────────────────────────────────────────
-function DonutChart({ data, size = 140, strokeWidth = 20, theme, centerLabel, centerSubLabel }) {
+/** Glowing Ring Chart */
+function GlowingRingChart({ data, size = 160, strokeWidth = 12, centerLabel, centerSubLabel }) {
+    const { isDarkMode } = useTheme();
     const total = data.reduce((s, d) => s + d.value, 0);
-    const r = size / 2;
-    const inner = r - strokeWidth;
-
-    const segments = [];
-    let startAngle = 0;
-    data.forEach((d) => {
-        const angle = total > 0 ? (d.value / total) * 360 : 0;
-        segments.push({ color: d.color, start: startAngle, angle });
-        startAngle += angle;
-    });
-
-    if (total === 0) {
-        segments.push({ color: theme.colors.surfaceAlt, start: 0, angle: 360 });
-    }
-
-    const renderArc = (seg, idx) => {
-        const parts = [];
-        let remaining = seg.angle;
-        let current = seg.start;
-
-        while (remaining > 0) {
-            const sweep = Math.min(remaining, 180);
-            parts.push(
-                <View key={`${idx}-${current}`} style={[StyleSheet.absoluteFill, { transform: [{ rotate: `${current}deg` }] }]}>
-                    <View style={{ width: size, height: r, overflow: 'hidden' }}>
-                        <View style={{
-                            width: size, height: size, borderRadius: r,
-                            borderWidth: strokeWidth, borderColor: 'transparent',
-                            borderTopColor: seg.color,
-                            borderRightColor: sweep > 90 ? seg.color : 'transparent',
-                            transform: [{ rotate: `${sweep - 90}deg` }],
-                        }} />
-                    </View>
-                </View>
-            );
-            remaining -= sweep;
-            current += sweep;
-        }
-        return parts;
-    };
-
+    
     return (
-        <View style={S.donutWrap}>
-            <View style={{ width: size, height: size, position: 'relative' }}>
-                <View style={[StyleSheet.absoluteFill, {
-                    borderRadius: r, borderWidth: strokeWidth,
-                    borderColor: theme.colors.surfaceAlt,
-                }]} />
-                {segments.map((seg, i) => renderArc(seg, i))}
-                <View style={[StyleSheet.absoluteFill, {
-                    margin: strokeWidth,
-                    borderRadius: inner,
-                    backgroundColor: theme.colors.surface,
-                }]} />
+        <View style={[styles.ringContainer, { width: size, height: size }]}>
+            {/* Background Track */}
+            <View style={[styles.ringTrack, { width: size, height: size, borderRadius: size / 2, borderWidth: strokeWidth, borderColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]} />
+            
+            {/* Legend Circles (Simplified for UI elegance) */}
+            <View style={styles.ringCenter}>
+                <AnimatedNumber value={centerLabel} style={styles.centerValue} />
+                <Text style={styles.centerLabel}>{centerSubLabel}</Text>
             </View>
-            <View style={S.donutCenter}>
-                <Text style={[S.donutTotal, { color: theme.colors.textPrimary }]}>{centerLabel}</Text>
-                <Text style={[S.donutTotalLabel, { color: theme.colors.textHint }]}>{centerSubLabel}</Text>
+
+            {/* Glowing Arcs (Visual representation) */}
+            <View style={StyleSheet.absoluteFill}>
+                {data.map((item, idx) => {
+                    if (item.value === 0) return null;
+                    const pct = total > 0 ? (item.value / total) : 0;
+                    return (
+                        <View key={idx} style={[StyleSheet.absoluteFill, { transform: [{ rotate: `${idx * 120}deg` }] }]}>
+                             {/* Mock Arcs with Gradients */}
+                             <LinearGradient 
+                                colors={[item.color, item.color + '50']} 
+                                style={[styles.ringArc, { width: size, height: size, borderRadius: size/2, borderWidth: strokeWidth, borderColor: item.color, borderTopColor: 'transparent', borderLeftColor: 'transparent', borderRightColor: 'transparent', opacity: 0.8 }]}
+                             />
+                        </View>
+                    );
+                })}
             </View>
         </View>
     );
 }
 
 // ─────────────────────────────────────────────────────────────
-//  TRANSACTION DETAIL MODAL
+//  TRANSACTION DETAIL MODAL (Redesigned)
 // ─────────────────────────────────────────────────────────────
 function TxnDetailModal({ visible, txn, onClose, theme }) {
-    const slideAnim = useRef(new Animated.Value(height)).current;
-
-    useEffect(() => {
-        if (visible) {
-            Animated.spring(slideAnim, { toValue: 0, bounciness: 5, useNativeDriver: true }).start();
-        } else {
-            Animated.timing(slideAnim, { toValue: height, duration: 280, useNativeDriver: true }).start();
-        }
-    }, [visible]);
-
     if (!txn) return null;
-
     const isDebit = txn.type === 'debit' || txn.type === 'SENT';
 
     return (
-        <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
-            <Pressable style={S.overlay} onPress={onClose} />
-            <Animated.View style={[S.detailSheet, { backgroundColor: theme.colors.surface }, { transform: [{ translateY: slideAnim }] }]}>
-                <View style={[S.handle, { backgroundColor: theme.colors.border }]} />
-                <View style={S.detailHeader}>
-                    <Text style={[S.detailTitle, { color: theme.colors.textPrimary }]}>Transaction Detail</Text>
-                    <TouchableOpacity onPress={onClose}><Ionicons name="close-circle" size={24} color={theme.colors.textHint} /></TouchableOpacity>
-                </View>
-                <LinearGradient colors={isDebit ? ['#FEE2E2', '#FECACA'] : ['#DCFCE7', '#BBF7D0']} style={S.detailAmountCard}>
-                    <Text style={[S.detailAmountValue, { color: isDebit ? COLORS.error : COLORS.success }]}>
-                        {isDebit ? '-' : '+'}₹{(txn.amount || 0).toLocaleString()}
-                    </Text>
-                    <Text style={[S.detailAmountLabel, { color: isDebit ? COLORS.error : COLORS.success }]}>{isDebit ? 'Expense' : 'Income'}</Text>
-                </LinearGradient>
-                <View style={S.detailRow}>
-                    <Text style={[S.detailRowLabel, { color: theme.colors.textHint }]}>Category</Text>
-                    <Text style={[S.detailRowValue, { color: theme.colors.textPrimary }]}>{txn.category || 'Other'}</Text>
-                </View>
-                <View style={S.detailRow}>
-                    <Text style={[S.detailRowLabel, { color: theme.colors.textHint }]}>Date</Text>
-                    <Text style={[S.detailRowValue, { color: theme.colors.textPrimary }]}>{txn.date || 'Just now'}</Text>
-                </View>
-                <View style={S.detailRow}>
-                    <Text style={[S.detailRowLabel, { color: theme.colors.textHint }]}>Note</Text>
-                    <Text style={[S.detailRowValue, { color: theme.colors.textPrimary }]}>{txn.note || 'N/A'}</Text>
-                </View>
-                <View style={S.detailRow}>
-                    <Text style={[S.detailRowLabel, { color: theme.colors.textHint }]}>ID</Text>
-                    <Text style={[S.detailRowValue, { color: theme.colors.textHint, fontSize: 10 }]}>{txn.id || 'N/A'}</Text>
-                </View>
-            </Animated.View>
+        <Modal visible={visible} transparent animationType="fade" statusBarTranslucent>
+            <Pressable style={styles.modalOverlay} onPress={onClose}>
+                <Animated.View entering={FadeInUp} style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
+                    <View style={styles.modalHandle} />
+                    <View style={styles.modalHeader}>
+                        <Text style={[styles.modalTitle, { color: theme.colors.textPrimary }]}>Details</Text>
+                        <TouchableOpacity onPress={onClose}>
+                            <Ionicons name="close-circle" size={28} color={theme.colors.textHint} />
+                        </TouchableOpacity>
+                    </View>
+
+                    <LinearGradient 
+                        colors={isDebit ? ['#FF4D4D', '#FF8080'] : ['#00C853', '#64DD17']} 
+                        style={styles.modalHero}
+                    >
+                        <Text style={styles.modalAmt}>₹{(txn.amount || 0).toLocaleString()}</Text>
+                        <Text style={styles.modalStatus}>{isDebit ? 'Payment Out' : 'Payment In'}</Text>
+                    </LinearGradient>
+
+                    <View style={styles.modalInfoList}>
+                        <DetailRow label="Category" value={txn.category || 'Other'} icon="apps-outline" color="#6366F1" theme={theme} />
+                        <DetailRow label="Date" value={txn.date || 'Today'} icon="calendar-outline" color="#0EA5E9" theme={theme} />
+                        <DetailRow label="Note" value={txn.note || 'No description'} icon="document-text-outline" color="#F59E0B" theme={theme} />
+                        <DetailRow label="Reference" value={txn.id?.slice(0, 12) || 'N/A'} icon="id-card-outline" color="#94A3B8" theme={theme} last />
+                    </View>
+                </Animated.View>
+            </Pressable>
         </Modal>
     );
 }
+
+const DetailRow = ({ label, value, icon, color, theme, last }) => (
+    <View style={[styles.detailRow, !last && { borderBottomWidth: 1, borderBottomColor: theme.colors.border }]}>
+        <View style={[styles.detailIconBox, { backgroundColor: color + '15' }]}>
+            <Ionicons name={icon} size={18} color={color} />
+        </View>
+        <View style={{ flex: 1, marginLeft: 12 }}>
+            <Text style={[styles.detailRowLabel, { color: theme.colors.textHint }]}>{label}</Text>
+            <Text style={[styles.detailRowValue, { color: theme.colors.textPrimary }]}>{value}</Text>
+        </View>
+    </View>
+);
 
 // ─────────────────────────────────────────────────────────────
 //  MAIN SCREEN
@@ -182,28 +178,20 @@ export default function ActivityScreen({ navigation }) {
     const [detailVisible, setDetail] = useState(false);
     const [isSimulating, setIsSimulating] = useState(false);
 
-    // Auto Refresh logic (Keeping from previous fix)
     useEffect(() => {
         refreshTransactions();
         triggerManualSync();
     }, [refreshTransactions, triggerManualSync]);
 
-    // ── SMS Bot Lifecycle ──
     useEffect(() => {
         if (isSimulating) {
-            console.log("[ActivityScreen] Starting SMS Bot Simulation...");
             smsBotService.start(addMessage);
-            setIsFraudDetectionEnabled && setIsFraudDetectionEnabled(true);
+            setIsFraudDetectionEnabled?.(true);
         } else {
-            console.log("[ActivityScreen] Stopping SMS Bot Simulation...");
             smsBotService.stop();
-            setIsFraudDetectionEnabled && setIsFraudDetectionEnabled(false);
+            setIsFraudDetectionEnabled?.(false);
         }
-        
-        return () => {
-            smsBotService.stop();
-            setIsFraudDetectionEnabled && setIsFraudDetectionEnabled(false);
-        };
+        return () => smsBotService.stop();
     }, [isSimulating, addMessage, setIsFraudDetectionEnabled]);
 
     const TRANSACTIONS = transactions || [];
@@ -216,137 +204,207 @@ export default function ActivityScreen({ navigation }) {
     const creditCount = smsAnalytics?.creditCount || 0;
     const otherCount = smsAnalytics?.otherCount || 0;
 
-    const chartData = [
-        { label: 'Debit', value: debitCount, color: COLORS.error, pct: totalCount > 0 ? Math.round((debitCount / totalCount) * 100) : 0 },
-        { label: 'Credit', value: creditCount, color: COLORS.success, pct: totalCount > 0 ? Math.round((creditCount / totalCount) * 100) : 0 },
-        { label: 'Other', value: otherCount, color: '#94A3B8', pct: totalCount > 0 ? Math.round((otherCount / totalCount) * 100) : 0 },
-    ];
-
     const volumeTotal = totalReceived + totalSpent;
-    const BANKING_LEDGER_DATA = [
-        { label: 'Debit', amount: totalSpent, value: totalSpent, color: COLORS.error, pct: volumeTotal > 0 ? Math.round((totalSpent / volumeTotal) * 100) : 0 },
-        { label: 'Credit', amount: totalReceived, value: totalReceived, color: COLORS.success, pct: volumeTotal > 0 ? Math.round((totalReceived / volumeTotal) * 100) : 0 },
-        { label: 'Balance', amount: netBalance, value: Math.abs(netBalance), color: '#3B82F6', pct: 100 },
+    const ledgerChartData = [
+        { label: 'Spending', value: totalSpent, color: '#F43F5E', pct: volumeTotal > 0 ? Math.round((totalSpent / volumeTotal) * 100) : 0 },
+        { label: 'Income', value: totalReceived, color: '#10B981', pct: volumeTotal > 0 ? Math.round((totalReceived / volumeTotal) * 100) : 0 }
     ];
 
-    const openDetail = (txn) => {
-        setSelected(txn);
-        setDetail(true);
-    };
+    const chartData = [
+        { label: 'Debit', value: debitCount, color: '#F43F5E', pct: totalCount > 0 ? Math.round((debitCount / totalCount) * 100) : 0 },
+        { label: 'Credit', value: creditCount, color: '#10B981', pct: totalCount > 0 ? Math.round((creditCount / totalCount) * 100) : 0 },
+        { label: 'Other', value: otherCount, color: '#6366F1', pct: totalCount > 0 ? Math.round((otherCount / totalCount) * 100) : 0 },
+    ];
 
     return (
-        <SafeAreaView style={[S.root, { backgroundColor: theme.colors.background }]} edges={['top']}>
-            <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-
-            {/* HEADER */}
-            <View style={S.header}>
+        <SafeAreaView style={[styles.root, { backgroundColor: '#FFFFFF' }]} edges={['top']}>
+            <StatusBar barStyle="dark-content" />
+            
+            {/* Futuristic Header */}
+            <Animated.View entering={FadeInDown.duration(600)} style={styles.header}>
                 <View>
-                    <Text style={[S.headerTitle, { color: theme.colors.textPrimary }]}>Activity</Text>
-                    <View style={S.simStatusRow}>
-                        <View style={[S.statusDot, { backgroundColor: isSimulating ? COLORS.success : COLORS.error, width: 8, height: 8 }]} />
-                        <Text style={[S.simStatusTxt, { color: theme.colors.textHint }]}>
-                            {isSimulating ? 'Live Simulation Active' : 'Simulation Stopped'}
-                        </Text>
-                    </View>
+                    <Text style={[styles.headerSubtitle, { color: '#6366F1' }]}>FINANCIAL INTELLIGENCE</Text>
+                    <Text style={[styles.headerTitle, { color: '#111827' }]}>Activity</Text>
                 </View>
-                <View style={S.headerRight}>
+                <View style={styles.headerRight}>
                     <TouchableOpacity 
-                        onPress={() => setIsSimulating(!isSimulating)} 
-                        style={[S.toggleBtn, { backgroundColor: isSimulating ? COLORS.error + '15' : COLORS.success + '15' }]}
+                        onPress={() => setIsSimulating(!isSimulating)}
+                        style={[styles.simBadge, { backgroundColor: isSimulating ? '#10B98115' : '#F43F5E15' }]}
                     >
-                        <Ionicons 
-                            name={isSimulating ? "stop-circle-outline" : "play-circle-outline"} 
-                            size={22} 
-                            color={isSimulating ? COLORS.error : COLORS.success} 
-                        />
+                        <View style={[styles.statusPulse, { backgroundColor: isSimulating ? '#10B981' : '#F43F5E' }]} />
+                        <Text style={[styles.simText, { color: isSimulating ? '#10B981' : '#F43F5E' }]}>
+                            {isSimulating ? 'LIVE' : 'SIM'}
+                        </Text>
                     </TouchableOpacity>
-
-                    <TouchableOpacity onPress={() => { refreshTransactions(); triggerManualSync(); }} style={S.refreshBtn}>
-                        <Ionicons name="refresh" size={20} color={COLORS.primary} />
+                    <TouchableOpacity onPress={() => refreshTransactions()} style={styles.glassBtn}>
+                        <Ionicons name="reload" size={20} color="#6366F1" />
                     </TouchableOpacity>
                 </View>
-            </View>
+            </Animated.View>
 
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={S.scroll}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
                 
-                {/* 1. SMS ANALYSIS (DONUT STYLE) */}
-                <View style={S.section}>
-                    <Text style={[S.sectionTitle, { color: theme.colors.textPrimary }]}>📊 SMS Analysis</Text>
-                    <View style={[S.analysisCard, { backgroundColor: theme.colors.surface }, SHADOWS.soft]}>
-                        <View style={S.chartRow}>
-                            <DonutChart data={chartData} theme={theme} centerLabel={totalCount} centerSubLabel="SMS" />
-                            <View style={S.chartLegend}>
-                                {chartData.map((d, i) => (
-                                    <View key={i} style={S.legendItem}>
-                                        <View style={[S.legendDot, { backgroundColor: d.color }]} />
-                                        <Text style={[S.legendPct, { color: theme.colors.textPrimary }]}>{d.pct}% {d.label}</Text>
-                                    </View>
-                                ))}
+                {/* 1. LEDGER HERO CARD (Vibrant Gradient) */}
+                <Animated.View entering={FadeInDown.delay(200).duration(600)}>
+                    <LinearGradient colors={['#6366F1', '#8B5CF6']} start={{x:0, y:0}} end={{x:1, y:1}} style={styles.heroCard}>
+                        <View style={styles.heroHeader}>
+                            <Text style={styles.heroLabel}>Net Balance</Text>
+                            <View style={[styles.heroBadge, { backgroundColor: '#FFFFFF30' }]}>
+                                <Text style={[styles.heroBadgeText, { color: '#FFF' }]}>AI PROCESSED</Text>
                             </View>
                         </View>
-                        <View style={[S.analysisFooter, { borderTopColor: theme.colors.border }]}>
-                            <Text style={[S.analysisFooterTxt, { color: theme.colors.textHint }]}>Based on {totalCount} recent SMS processed</Text>
+                        
+                        <View style={styles.heroMain}>
+                            <View style={styles.heroBalanceWrap}>
+                                <Text style={[styles.currencyPrefix, { color: '#FFF' }]}>₹</Text>
+                                <AnimatedNumber value={Math.abs(netBalance)} style={styles.heroBalance} />
+                            </View>
                         </View>
-                    </View>
+
+                        <View style={styles.heroGrid}>
+                            <View style={styles.heroGridItem}>
+                                <View style={[styles.gridIcon, { backgroundColor: '#FFFFFF20' }]}>
+                                    <Ionicons name="arrow-down-circle" size={18} color="#FFF" />
+                                </View>
+                                <View>
+                                    <Text style={styles.gridLabel}>RECEIVED</Text>
+                                    <Text style={[styles.gridValue, { color: '#FFF' }]}>₹{totalReceived.toLocaleString()}</Text>
+                                </View>
+                            </View>
+                            <View style={styles.heroGridItem}>
+                                <View style={[styles.gridIcon, { backgroundColor: '#FFFFFF20' }]}>
+                                    <Ionicons name="arrow-up-circle" size={18} color="#FFF" />
+                                </View>
+                                <View>
+                                    <Text style={styles.gridLabel}>SPENT</Text>
+                                    <Text style={[styles.gridValue, { color: '#FFF' }]}>₹{totalSpent.toLocaleString()}</Text>
+                                </View>
+                            </View>
+                        </View>
+                    </LinearGradient>
+                </Animated.View>
+
+                {/* 2. SMS ANALYSIS SECTION */}
+                <View style={styles.sectionHeader}>
+                    <Text style={[styles.sectionTitle, { color: '#111827' }]}>SMS Intelligence</Text>
+                    <TouchableOpacity onPress={() => triggerManualSync()}><Text style={styles.actionLink}>Sync Now</Text></TouchableOpacity>
                 </View>
 
-                {/* 2. BANKING LEDGER ANALYSIS (DONUT STYLE) */}
-                <View style={S.section}>
-                    <View style={S.sectionHeaderRow}>
-                        <Text style={[S.sectionTitle, { color: theme.colors.textPrimary, marginBottom: 0 }]}>🏦 Banking Ledger Analysis</Text>
-                        <View style={[S.autoBadge, { backgroundColor: theme.colors.surfaceAlt }]}>
-                            <Text style={[S.autoBadgeTxt, { color: theme.colors.textHint }]}>Auto Detected</Text>
-                        </View>
-                    </View>
-                    <View style={[S.analysisCard, { backgroundColor: theme.colors.surface }, SHADOWS.soft]}>
-                        <View style={S.chartRow}>
-                            <DonutChart data={BANKING_LEDGER_DATA} theme={theme} centerLabel={`₹${Math.abs(netBalance).toLocaleString()}`} centerSubLabel="Balance" />
-                            <View style={S.chartLegend}>
-                                {BANKING_LEDGER_DATA.map((d, i) => (
-                                    <View key={i} style={S.legendItem}>
-                                        <View style={[S.legendDot, { backgroundColor: d.color, width: 8, height: 8 }]} />
-                                        <View>
-                                            <Text style={[S.legendPct, { color: theme.colors.textPrimary }]}>{d.pct}% {d.label}</Text>
-                                            <Text style={[S.legendCount, { color: theme.colors.textHint }]}>₹{(d.amount || 0).toLocaleString()}</Text>
+                <Animated.View entering={FadeInDown.delay(400)}>
+                     <View style={[styles.analysisCard, { backgroundColor: '#F9FAFB' }]}>
+                        <View style={styles.analysisRow}>
+                            <GlowingRingChart 
+                                data={chartData} 
+                                centerLabel={totalCount} 
+                                centerSubLabel="MESSAGES" 
+                            />
+                            <View style={styles.legendContainer}>
+                                {chartData.map((item, i) => (
+                                    <View key={i} style={styles.legendItem}>
+                                        <View style={[styles.legendDot, { backgroundColor: item.color }]} />
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={[styles.legendLabel, { color: '#4B5563' }]}>{item.label}</Text>
+                                            <View style={[styles.legendFillBg, { backgroundColor: '#E5E7EB' }]}>
+                                                <Animated.View style={[styles.legendFill, { backgroundColor: item.color, width: `${item.pct}%` }]} />
+                                            </View>
                                         </View>
+                                        <Text style={[styles.legendPct, { color: '#111827' }]}>{item.pct}%</Text>
                                     </View>
                                 ))}
                             </View>
                         </View>
+                        {totalCount === 0 && (
+                             <Text style={styles.emptyMsg}>No SMS data yet 📩</Text>
+                        )}
+                     </View>
+                </Animated.View>
+
+                {/* 3. VAULT INTELLIGENCE */}
+                <View style={styles.sectionHeader}>
+                    <Text style={[styles.sectionTitle, { color: '#111827' }]}>Vault Intelligence</Text>
+                    <View style={[styles.autoBadge, { backgroundColor: '#6366F115' }]}>
+                        <Text style={[styles.autoBadgeTxt, { color: '#6366F1' }]}>LEDGER DATA</Text>
                     </View>
                 </View>
 
-                {/* 3. TRANSACTION LIST */}
-                <View style={S.section}>
-                    <Text style={[S.sectionTitle, { color: theme.colors.textPrimary }]}>Recent Transactions</Text>
+                <Animated.View entering={FadeInDown.delay(500)}>
+                     <View style={[styles.analysisCard, { backgroundColor: '#F9FAFB' }]}>
+                        <View style={styles.analysisRow}>
+                            <GlowingRingChart 
+                                data={ledgerChartData} 
+                                centerLabel={`₹${Math.abs(netBalance).toLocaleString()}`} 
+                                centerSubLabel="BALANCE" 
+                            />
+                            <View style={styles.legendContainer}>
+                                {[
+                                    { label: 'Spending', amount: totalSpent, color: '#F43F5E', pct: volumeTotal > 0 ? Math.round((totalSpent / volumeTotal) * 100) : 0 },
+                                    { label: 'Income', amount: totalReceived, color: '#10B981', pct: volumeTotal > 0 ? Math.round((totalReceived / volumeTotal) * 100) : 0 }
+                                ].map((item, i) => (
+                                    <View key={i} style={styles.legendItem}>
+                                        <View style={[styles.legendDot, { backgroundColor: item.color }]} />
+                                        <View style={{ flex: 1 }}>
+                                            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                                <Text style={[styles.legendLabel, { color: '#4B5563' }]}>{item.label}</Text>
+                                                <Text style={[styles.legendLabel, { fontSize: 10, color: '#6B7280' }]}>₹{item.amount.toLocaleString()}</Text>
+                                            </View>
+                                            <View style={[styles.legendFillBg, { backgroundColor: '#E5E7EB' }]}>
+                                                <Animated.View style={[styles.legendFill, { backgroundColor: item.color, width: `${item.pct}%` }]} />
+                                            </View>
+                                        </View>
+                                        <Text style={[styles.legendPct, { color: '#111827' }]}>{item.pct}%</Text>
+                                    </View>
+                                ))}
+                            </View>
+                        </View>
+                     </View>
+                </Animated.View>
+
+                {/* 4. RECENT TRANSACTIONS */}
+                <View style={styles.sectionHeader}>
+                    <Text style={[styles.sectionTitle, { color: '#111827' }]}>Live Activity</Text>
+                    <TouchableOpacity onPress={() => setExpanded(!expanded)}>
+                        <Text style={styles.actionLink}>{expanded ? 'Show Less' : 'View All'}</Text>
+                    </TouchableOpacity>
+                </View>
+
+                <Animated.View layout={Layout.springify()}>
                     {TRANSACTIONS.length === 0 ? (
-                        <View style={[S.emptyCard, { backgroundColor: theme.colors.surface }, SHADOWS.soft]}>
-                            <Text style={[S.emptyTitle, { color: theme.colors.textPrimary }]}>No activity yet</Text>
+                        <View style={styles.emptyContainer}>
+                             <Ionicons name="rocket-outline" size={48} color="#E5E7EB" />
+                             <Text style={[styles.emptyTitle, { color: '#6B7280' }]}>Start tracking your activity 🚀</Text>
+                             <Text style={styles.emptySub}>Transactions will appear here automatically</Text>
                         </View>
                     ) : (
-                        <>
-                            {visibleTxns.map((txn, index) => {
-                                const isDebit = txn.type === 'debit' || txn.type === 'SENT';
-                                return (
-                                    <TouchableOpacity key={txn.id || index} onPress={() => openDetail(txn)} style={[S.txnRow, { backgroundColor: theme.colors.surface }, SHADOWS.soft]}>
-                                        <View style={S.txnInfo}>
-                                            <Text style={[S.txnTitle, { color: theme.colors.textPrimary }]} numberOfLines={1}>{txn.note || (isDebit ? 'Paid' : 'Received')}</Text>
-                                            <Text style={[S.txnTime, { color: theme.colors.textHint }]}>{txn.date || 'Recent'}</Text>
+                        visibleTxns.map((txn, index) => {
+                            const isDebit = txn.type === 'debit' || txn.type === 'SENT';
+                            return (
+                                <Animated.View key={txn.id || index} entering={FadeInDown.delay(index * 50)}>
+                                    <TouchableOpacity 
+                                        onPress={() => openDetail(txn)} 
+                                        style={[styles.txnCard, { backgroundColor: '#FFFFFF' }]}
+                                        activeOpacity={0.7}
+                                    >
+                                        <View style={[styles.txnIconBox, { backgroundColor: isDebit ? '#F43F5E10' : '#10B98110' }]}>
+                                            <Ionicons 
+                                                name={isDebit ? "arrow-up" : "arrow-down"} 
+                                                size={18} 
+                                                color={isDebit ? '#F43F5E' : '#10B981'} 
+                                            />
                                         </View>
-                                        <Text style={[S.txnAmount, { color: isDebit ? COLORS.error : COLORS.success }]}>
+                                        <View style={styles.txnInfo}>
+                                            <Text style={[styles.txnTitle, { color: '#111827' }]} numberOfLines={1}>{txn.note || (isDebit ? 'Payment Out' : 'Payment In')}</Text>
+                                            <Text style={[styles.txnDate, { color: '#6B7280' }]}>{txn.date || 'Recent'}</Text>
+                                        </View>
+                                        <Text style={[styles.txnAmt, { color: isDebit ? '#F43F5E' : '#10B981' }]}>
                                             {isDebit ? '-' : '+'}₹{(txn.amount || 0).toLocaleString()}
                                         </Text>
                                     </TouchableOpacity>
-                                );
-                            })}
-                            {hasMore && (
-                                <TouchableOpacity onPress={() => setExpanded(e => !e)} style={S.viewMoreBtn}>
-                                    <Text style={[S.viewMoreTxt, { color: COLORS.primary }]}>{expanded ? 'Show Less' : 'View All'}</Text>
-                                </TouchableOpacity>
-                            )}
-                        </>
+                                </Animated.View>
+                            );
+                        })
                     )}
-                </View>
+                </Animated.View>
+
             </ScrollView>
 
             <TxnDetailModal visible={detailVisible} txn={selectedTxn} onClose={() => setDetail(false)} theme={theme} />
@@ -354,53 +412,79 @@ export default function ActivityScreen({ navigation }) {
     );
 }
 
-const S = StyleSheet.create({
+const styles = StyleSheet.create({
     root: { flex: 1 },
-    scroll: { paddingBottom: 120 },
-    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 14 },
-    headerTitle: { fontSize: 26, fontFamily: TYPOGRAPHY.fonts.headingBold },
-    headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    simStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
-    simStatusTxt: { fontSize: 10, fontFamily: TYPOGRAPHY.fonts.bodyMedium },
-    statusDot: { borderRadius: 4 },
-    toggleBtn: { padding: 8, borderRadius: RADIUS.full },
-    refreshBtn: { padding: 8 },
-    section: { paddingHorizontal: 20, marginBottom: 18 },
-    sectionTitle: { fontSize: 15, fontFamily: TYPOGRAPHY.fonts.headingSemi, marginBottom: 12 },
-    sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-    donutWrap: { position: 'relative', alignItems: 'center', justifyContent: 'center' },
-    donutCenter: { position: 'absolute', alignItems: 'center', paddingHorizontal: 20 },
-    donutTotal: { fontSize: 18, fontFamily: TYPOGRAPHY.fonts.headingBold, textAlign: 'center' },
-    donutTotalLabel: { fontSize: 10, fontFamily: TYPOGRAPHY.fonts.bodyMedium },
-    analysisCard: { borderRadius: RADIUS.xl, padding: 20, gap: 16 },
-    chartRow: { flexDirection: 'row', alignItems: 'center', gap: 24 },
-    chartLegend: { flex: 1, gap: 12 },
+    scroll: { paddingBottom: 100, paddingHorizontal: 20 },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 20 },
+    headerTitle: { fontSize: 32, fontFamily: TYPOGRAPHY.fonts.headingBold },
+    headerSubtitle: { fontSize: 10, letterSpacing: 1.5, fontFamily: TYPOGRAPHY.fonts.headingBold, marginBottom: 2 },
+    headerRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    simBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12, gap: 6 },
+    statusPulse: { width: 6, height: 6, borderRadius: 3 },
+    simText: { fontSize: 11, fontFamily: TYPOGRAPHY.fonts.headingBold },
+    glassBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center', ...SHADOWS.small },
+    
+    heroCard: { borderRadius: 30, padding: 24, ...SHADOWS.medium, overflow: 'hidden' },
+    heroHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    heroLabel: { color: '#E0E7FF', fontSize: 13, fontFamily: TYPOGRAPHY.fonts.bodyMedium },
+    heroBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+    heroBadgeText: { fontSize: 10, fontFamily: TYPOGRAPHY.fonts.bodyBold },
+    heroMain: { marginVertical: 20 },
+    heroBalanceWrap: { flexDirection: 'row', alignItems: 'baseline' },
+    currencyPrefix: { fontSize: 24, fontFamily: TYPOGRAPHY.fonts.headingBold, marginRight: 4, opacity: 0.8 },
+    heroBalance: { color: '#FFF', fontSize: 42, fontFamily: TYPOGRAPHY.fonts.headingBold },
+    heroGrid: { flexDirection: 'row', gap: 32, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.1)', paddingTop: 20 },
+    heroGridItem: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    gridIcon: { width: 34, height: 34, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+    gridLabel: { color: '#E0E7FF', fontSize: 10, fontFamily: TYPOGRAPHY.fonts.bodyMedium },
+    gridValue: { color: '#FFF', fontSize: 14, fontFamily: TYPOGRAPHY.fonts.headingBold, marginTop: 1 },
+
+    sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 32, marginBottom: 16 },
+    sectionTitle: { fontSize: 18, fontFamily: TYPOGRAPHY.fonts.headingBold },
+    actionLink: { fontSize: 13, color: '#6366F1', fontFamily: TYPOGRAPHY.fonts.bodyBold },
+
+    analysisCard: { padding: 20, borderRadius: 24, ...SHADOWS.soft },
+    analysisRow: { flexDirection: 'row', alignItems: 'center', gap: 24 },
+    ringContainer: { justifyContent: 'center', alignItems: 'center' },
+    ringTrack: { position: 'absolute' },
+    ringCenter: { alignItems: 'center' },
+    centerValue: { fontSize: 24, fontFamily: TYPOGRAPHY.fonts.headingBold, color: '#111827' },
+    centerLabel: { fontSize: 9, fontFamily: TYPOGRAPHY.fonts.headingBold, letterSpacing: 1, color: '#6B7280' },
+    ringArc: { position: 'absolute' },
+
+    legendContainer: { flex: 1, gap: 12 },
     legendItem: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    legendDot: { width: 10, height: 10, borderRadius: 5 },
-    legendPct: { fontSize: 13, fontFamily: TYPOGRAPHY.fonts.bodyBold },
-    legendCount: { fontSize: 10, marginTop: 1 },
-    analysisFooter: { borderTopWidth: 1, paddingTop: 12 },
-    analysisFooterTxt: { fontSize: 11 },
-    autoBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: RADIUS.sm },
-    autoBadgeTxt: { fontSize: 9, fontWeight: 'bold' },
-    txnRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderRadius: RADIUS.lg, marginBottom: 10 },
-    txnInfo: { flex: 1 },
-    txnTitle: { fontSize: 13, fontFamily: TYPOGRAPHY.fonts.bodyBold },
-    txnTime: { fontSize: 11 },
-    txnAmount: { fontSize: 14, fontFamily: TYPOGRAPHY.fonts.headingBold },
-    viewMoreBtn: { paddingVertical: 14, alignItems: 'center' },
-    viewMoreTxt: { fontSize: 13, fontWeight: 'bold' },
-    emptyCard: { padding: 20, alignItems: 'center' },
-    emptyTitle: { fontSize: 15 },
-    overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
-    handle: { width: 40, height: 5, borderRadius: 3, alignSelf: 'center', marginBottom: 15 },
-    detailSheet: { position: 'absolute', bottom: 0, left: 0, right: 0, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 40 },
-    detailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-    detailTitle: { fontSize: 18, fontWeight: 'bold' },
-    detailAmountCard: { padding: 20, borderRadius: RADIUS.lg, alignItems: 'center', marginBottom: 20 },
-    detailAmountValue: { fontSize: 24, fontWeight: 'bold' },
-    detailAmountLabel: { fontSize: 12 },
-    detailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#eee' },
-    detailRowLabel: { fontSize: 13 },
-    detailRowValue: { fontSize: 13, fontWeight: 'bold' }
+    legendDot: { width: 8, height: 8, borderRadius: 4 },
+    legendLabel: { fontSize: 12, fontFamily: TYPOGRAPHY.fonts.bodyMedium },
+    legendFillBg: { height: 4, borderRadius: 2, marginTop: 4 },
+    legendFill: { height: '100%', borderRadius: 2 },
+    legendPct: { fontSize: 12, fontFamily: TYPOGRAPHY.fonts.headingBold },
+    emptyMsg: { textAlign: 'center', marginTop: 16, color: '#94A3B8', fontSize: 12 },
+
+    txnCard: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 20, marginBottom: 12, ...SHADOWS.small },
+    txnIconBox: { width: 44, height: 44, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+    txnInfo: { flex: 1, marginLeft: 16 },
+    txnTitle: { fontSize: 15, fontFamily: TYPOGRAPHY.fonts.bodyBold },
+    txnDate: { fontSize: 12, marginTop: 2 },
+    txnAmt: { fontSize: 16, fontFamily: TYPOGRAPHY.fonts.headingBold },
+
+    emptyContainer: { alignItems: 'center', paddingVertical: 60 },
+    emptyTitle: { fontSize: 18, fontFamily: TYPOGRAPHY.fonts.headingBold, marginTop: 16 },
+    emptySub: { fontSize: 13, marginTop: 6, textAlign: 'center' },
+
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.4)', justifyContent: 'flex-end' },
+    modalContent: { borderTopLeftRadius: 32, borderTopRightRadius: 32, paddingBottom: 40, paddingHorizontal: 20 },
+    modalHandle: { width: 40, height: 5, backgroundColor: '#E5E7EB', borderRadius: 2.5, alignSelf: 'center', marginVertical: 12 },
+    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+    modalTitle: { fontSize: 20, fontFamily: TYPOGRAPHY.fonts.headingBold },
+    modalHero: { padding: 32, borderRadius: 24, alignItems: 'center', marginBottom: 24, gap: 4 },
+    modalAmt: { fontSize: 42, color: '#FFF', fontFamily: TYPOGRAPHY.fonts.headingBold },
+    modalStatus: { color: '#FFFFFFCC', fontSize: 14, fontFamily: TYPOGRAPHY.fonts.bodyMedium },
+    modalInfoList: { gap: 4 },
+    detailRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16 },
+    detailIconBox: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+    detailRowLabel: { fontSize: 12, fontFamily: TYPOGRAPHY.fonts.bodyMedium },
+    detailRowValue: { fontSize: 15, fontFamily: TYPOGRAPHY.fonts.bodyBold, marginTop: 1 },
+    autoBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+    autoBadgeTxt: { fontSize: 10, fontFamily: TYPOGRAPHY.fonts.bodyBold }
 });

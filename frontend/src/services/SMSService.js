@@ -41,6 +41,32 @@ class SMSService {
     }
 
     /**
+     * High-level classification for SMS filtering logic.
+     */
+    classifySMS(text) {
+        if (!text) return 'spam';
+        const body = text.toLowerCase();
+        
+        // 1. Financial (Transactions & Bank Alerts)
+        if (body.includes('credited') || body.includes('debited') || body.includes('txn') || body.includes('upi') || body.includes('a/c') || body.includes('bank') || body.includes('available balance')) {
+            return 'financial';
+        }
+        
+        // 2. OTP / Security
+        if (body.includes('otp') || body.includes('verification code') || body.includes('secret code') || body.includes('login code') || body.includes('one-time password')) {
+            return 'otp';
+        }
+
+        // 3. E-commerce / Delivery
+        if (body.includes('order') || body.includes('delivered') || body.includes('shipped') || body.includes('tracking') || body.includes('out for delivery') || body.includes('package')) {
+            return 'ecommerce';
+        }
+
+        // 4. Everything else is Spam/Promotional
+        return 'spam';
+    }
+
+    /**
      * Categorizes a transaction based on keywords in the SMS body.
      */
     detectCategory(text) {

@@ -13,8 +13,11 @@ import {
     HelpSupportScreen, 
     AboutScreen,
     StockMarketScreen,
-    LogsTransactionsScreen
+    LogsTransactionsScreen,
+    ParentalControlScreen,
+    MessageCabinetScreen
 } from '../drawer/DrawerScreens';
+
 
 const Drawer = createDrawerNavigator();
 
@@ -61,9 +64,18 @@ export default function DrawerNavigator() {
                 component={StockMarketScreen} 
             />
             <Drawer.Screen 
+                name="ParentalControl" 
+                component={ParentalControlScreen} 
+            />
+            <Drawer.Screen 
+                name="MessageCabinet" 
+                component={MessageCabinetScreen} 
+            />
+            <Drawer.Screen 
                 name="About" 
                 component={AboutScreen} 
             />
+
         </Drawer.Navigator>
     );
 }
